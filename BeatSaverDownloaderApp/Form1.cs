@@ -38,6 +38,8 @@ namespace BeatSaverDownloader {
         const string labelText = "Page {0}";
 
         public Form1() {
+            //AppDomain.CurrentDomain.FirstChanceException += CurrentDomain_FirstChanceException; //DEBUG
+
             InitializeComponent();
             AppDir.Create();
             if (AppDir.GetDirectories().Any(o => o.Name == "Downloads")) {
@@ -48,15 +50,24 @@ namespace BeatSaverDownloader {
                 DownloadsDir = AppDir.CreateSubdirectory("Downloads");
             }
             WorkerThread = new Thread(o => {
-                GetObjects();
-                //MessageBox.Show($"{SongObjects.Count} Songs retrieved");
+                try {
+                    GetObjects();
+                } catch(Exception ex) {
+                    MessageBox.Show(ex.Message);
+                }
                 WorkerThread.Join();
             });
             WorkerThread.IsBackground = true;
-
+            
             OnDeserialize += onDeserialize;
 
             WorkerThread.Start();
+        }
+
+        private void CurrentDomain_FirstChanceException(object sender, System.Runtime.ExceptionServices.FirstChanceExceptionEventArgs e) {
+            using (var f = new StreamWriter("Log.txt", true)) {
+                f.WriteLine(e.Exception.ToString());
+            }
         }
 
         delegate void UpdatePanelDelegate(SongItem[] songs);
@@ -122,7 +133,7 @@ namespace BeatSaverDownloader {
                             using (var ms = new MemoryStream(imageBytes))
                                 return new Tuple<SongJsonObject, Image>(o, Image.FromStream(ms));
                         } catch(ArgumentException ex) {
-                            Console.WriteLine($"[{o.Id}] Image doesn't exist"); 
+                            Console.WriteLine($"[{o.Id}] Image doesn't exist");
                             using (var ms = new MemoryStream(client.DownloadData("https://pbs.twimg.com/profile_images/955933299238756352/KAIUfh1q_400x400.jpg")))
                                 return new Tuple<SongJsonObject, Image>(o, Image.FromStream(ms));
                         }
@@ -136,21 +147,25 @@ namespace BeatSaverDownloader {
         private void ButtonDownload_Click(object sender, EventArgs e) {
             if (flowLayoutPanel1.Controls.Count == 0) return;
             if (DownloaderThread == null) {
-                DownloaderThread = new Thread(DownloadSongs)
+                DownloaderThread = new Thread(() => {
+                    DownloadSongs();
+                })
                 {
                     IsBackground = true
                 };
+                ButtonDownload.Enabled = false;
                 DownloaderThread.Start();
             }
-            ButtonDownload.Enabled = false;
         }
 
         Dictionary<int, string> CompletedIDs { get; set; } = new Dictionary<int, string>();
 
         delegate void genericDelegate();
         void DownloadSongs() {
+            var historyPath = Path.Combine(CustomSongs.FullName, "History.json");
             try {
-                var historyString = File.ReadAllText(Path.Combine(CustomSongs.FullName, "History.json"));
+                if (!File.Exists(historyPath)) throw new FileNotFoundException("History doesn't exist");
+                var historyString = File.ReadAllText(historyPath);
                 if (historyString != string.Empty) CompletedIDs = JsonConvert.DeserializeObject<Dictionary<int, string>>(historyString);
             } catch (FileNotFoundException ex) {
                 Console.WriteLine("History.json does not yet exist");
