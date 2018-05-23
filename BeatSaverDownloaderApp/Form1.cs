@@ -49,7 +49,7 @@ namespace BeatSaverDownloader {
             }
             WorkerThread = new Thread(o => {
                 GetObjects();
-                MessageBox.Show($"{SongObjects.Count} Songs retrieved");
+                //MessageBox.Show($"{SongObjects.Count} Songs retrieved");
                 WorkerThread.Join();
             });
             WorkerThread.IsBackground = true;
@@ -112,7 +112,8 @@ namespace BeatSaverDownloader {
                     //Console.WriteLine($"Current Offset: {i}");
                     objs = JsonConvert.DeserializeObject<SongJsonObject[]>(jsonString);
                     x.AddRange(objs);
-                    jsonString = client.DownloadString(string.Format(API, ++CurrentOffset));
+                    CurrentOffset += 15;
+                    jsonString = client.DownloadString(string.Format(API, CurrentOffset));
                     OnDeserialize?.Invoke(this, objs.Select(o => {
                         var imageUrl = string.Format(IMAGE, o.Id, o.Img);
                         var imageBytes = client.DownloadData(imageUrl);
