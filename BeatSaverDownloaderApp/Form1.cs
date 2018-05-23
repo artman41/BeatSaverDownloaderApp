@@ -106,6 +106,7 @@ namespace BeatSaverDownloader {
             var x = new List<SongJsonObject>();
             //var y = new List<Tuple<SongJsonObject, Image>>();
             using (var client = new WebClient()) {
+                client.Headers.Add("user-agent", $"BeatSaverDownloaderApp-{Application.ProductVersion}");
                 string jsonString = client.DownloadString(string.Format(API, CurrentOffset));
                 SongJsonObject[] objs;
                 while (jsonString != "[]" && jsonString != string.Empty) {
