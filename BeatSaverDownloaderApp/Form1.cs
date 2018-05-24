@@ -266,6 +266,7 @@ namespace BeatSaverDownloader {
             string zipPath = string.Empty;
             using (var client = new WebClient()) {
                 while (run) {
+                    Log($"Progress Bar @ {progressBar1.Value}/{progressBar1.Maximum}");
                     //if (zipPath != string.Empty && File.Exists(zipPath)) File.Delete(zipPath);
                     LabelCurrentDownloading?.Invoke(new genericDelegate(() => LabelCurrentDownloading.Text = ""), new object[] { });
                     var historyFile = new FileInfo(Path.Combine(CustomSongs.FullName, "History.json"));
@@ -274,7 +275,9 @@ namespace BeatSaverDownloader {
                     ListViewItem temp = Songs[i];
                     if (JumpCheck.Checked) {
                         listView1?.Invoke(new genericDelegate(() => {
-                            listView1.FocusedItem = temp;
+                            int nextOne = listView1.Items.IndexOf(temp) + 3;
+                            var focusItem = nextOne >= listView1.Items.Count ? temp : listView1.Items[nextOne];
+                            listView1.FocusedItem = focusItem;
                         }), new object[] { });
                     }
                     var data = ((ListViewItemData)temp.Tag);
@@ -284,7 +287,11 @@ namespace BeatSaverDownloader {
                         LabelCurrentDownloading?.Invoke(new genericDelegate(() => LabelCurrentDownloading.Text = $"Downloading: {temp.Text} [{data.ID}]"), new object[] { });
                         zipPath = Path.Combine(DownloadsDir.FullName, $"{data.ID}.zip");
                         client.DownloadFile(string.Format(DOWNLOAD_LINK, data.ID), zipPath);
-                        listView1?.Invoke(new genericDelegate(() =>{ data.State = ListViewItemData._State.Processing;temp.ForeColor = Color.Orange; }), new object[] { });
+                        listView1?.Invoke(new genericDelegate(() =>{
+                            temp.Tag = new ListViewItemData {
+                                ID = data.ID,
+                                State = ListViewItemData._State.Processing
+                            }; temp.ForeColor = Color.Orange; }), new object[] { });
                         ZipArchive zip = null;
                         try {
                             zip = ZipFile.OpenRead(zipPath);
@@ -310,7 +317,11 @@ namespace BeatSaverDownloader {
                             } catch (IOException) {
                                 Log($"Failed to remove Zip [{data.ID}]");
                             }
-                            listView1?.Invoke(new genericDelegate(() => { data.State = ListViewItemData._State.Processed; temp.ForeColor = Color.Green; }), new object[] { });
+                            listView1?.Invoke(new genericDelegate(() => {
+                                temp.Tag = new ListViewItemData {
+                                    ID = data.ID,
+                                    State = ListViewItemData._State.Processed
+                                }; temp.ForeColor = Color.Green; }), new object[] { });
                             progressBar1?.Invoke(new genericDelegate(UpdateProgressBar), new object[] { });
                             CompletedIDs.Add(data.ID, songName);
                             using (var f = new StreamWriter(historyFile.Open(FileMode.Create, FileAccess.Write, FileShare.Read))) {
@@ -318,7 +329,11 @@ namespace BeatSaverDownloader {
                             }
                             continue;
                         }
-                        listView1?.Invoke(new genericDelegate(() => { data.State = ListViewItemData._State.Processed; temp.ForeColor = Color.Green; }), new object[] { });
+                        listView1?.Invoke(new genericDelegate(() => {
+                            temp.Tag = new ListViewItemData {
+                                ID = data.ID,
+                                State = ListViewItemData._State.Processed
+                            }; temp.ForeColor = Color.Green; }), new object[] { });
                         progressBar1?.Invoke(new genericDelegate(UpdateProgressBar), new object[] { });
                         #endregion
                         Log($"Downloaded {songName} [{data.ID}] to {CustomSongs.FullName}");
@@ -329,12 +344,22 @@ namespace BeatSaverDownloader {
                     } else {
                         try {
                             Thread.Sleep(15);
-                            listView1?.Invoke(new genericDelegate(() => { data.State = ListViewItemData._State.Processed; temp.ForeColor = Color.Green; }), new object[] { });
+                            listView1?.Invoke(new genericDelegate(() => {
+                                temp.Tag = new ListViewItemData {
+                                    ID = data.ID,
+                                    State = ListViewItemData._State.Processed
+                                }; temp.ForeColor = Color.Green; }), new object[] { });
                             progressBar1?.Invoke(new genericDelegate(UpdateProgressBar), new object[] { });
                         } catch (InvalidOperationException ex) {
                             Log($"[{data.ID}] {ex.Message}");
                             Thread.Sleep(10);
-                            listView1?.Invoke(new genericDelegate(() => { data.State = ListViewItemData._State.Processed; temp.ForeColor = Color.Green; }), new object[] { });
+                            listView1?.Invoke(new genericDelegate(() => {
+                                temp.Tag = new ListViewItemData {
+                                    ID = data.ID,
+                                    State = ListViewItemData._State.Processed
+                                };
+                                temp.ForeColor = Color.Green;
+                            }), new object[] { });
                             progressBar1?.Invoke(new genericDelegate(UpdateProgressBar), new object[] { });
                         }
                     }
@@ -348,7 +373,11 @@ namespace BeatSaverDownloader {
         }
 
         void UpdateProgressBar() {
-            this.progressBar1.Value = Songs.Count(o => ((ListViewItemData)o.Tag).State == ListViewItemData._State.Processed);
+            var count = Songs.Count(o => {
+                var state = ((ListViewItemData)o.Tag).State;
+                return state == ListViewItemData._State.Processed;
+            });
+            this.progressBar1.Value = count;
         }
 
         private void Form1_FormClosing(object sender, FormClosingEventArgs e) {
