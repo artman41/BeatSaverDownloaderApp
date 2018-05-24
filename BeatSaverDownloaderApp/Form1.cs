@@ -13,6 +13,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.IO.Compression;
 using Newtonsoft.Json.Linq;
+using System.Diagnostics;
 
 namespace BeatSaverDownloader {
     public partial class Form1 : Form {
@@ -58,13 +59,13 @@ namespace BeatSaverDownloader {
             WorkerThread = new Thread(o => {
                 try {
                     GetObjects();
-                } catch(Exception ex) {
+                } catch (Exception ex) {
                     MessageBox.Show(ex.Message);
                 }
                 WorkerThread.Join();
             });
             WorkerThread.IsBackground = true;
-            
+
             OnDeserialize += onDeserialize;
 
             WorkerThread.Start();
@@ -83,7 +84,7 @@ namespace BeatSaverDownloader {
                 }
                 var githubReleasePage = JsonConvert.DeserializeObject<JObject>(githubJsonString);
                 var remoteVersion = new Version(githubReleasePage["tag_name"].ToString());
-                if(remoteVersion.CompareTo(new Version(Application.ProductVersion)) > 0) {
+                if (remoteVersion.CompareTo(new Version(Application.ProductVersion)) > 0) {
                     return new Tuple<bool, Version>(true, remoteVersion);
                 }
             }
@@ -130,11 +131,11 @@ namespace BeatSaverDownloader {
             LabelOffset.Text = string.Format(labelText, CurrentOffset);
             isShown = true;
             CustomSongs = CustomSongsDialog.GetDirectoryInfo();
-            if(CustomSongs == null) {
+            if (CustomSongs == null) {
                 MessageBox.Show("You did not set a correct path for the CustomSongs directory.");
                 Application.Exit();
             }
-            run = true;    
+            run = true;
         }
 
         int CurrentOffset { get; set; } = 0;
@@ -147,7 +148,7 @@ namespace BeatSaverDownloader {
                 string jsonString = client.DownloadString(string.Format(API, CurrentOffset));
                 SongJsonObject[] objs;
                 while (jsonString != "[]" && jsonString != string.Empty) {
-                    //Console.WriteLine($"Current Offset: {i}");
+                    //Log($"Current Offset: {i}");
                     objs = JsonConvert.DeserializeObject<SongJsonObject[]>(jsonString);
                     x.AddRange(objs);
                     CurrentOffset += 15;
@@ -158,8 +159,8 @@ namespace BeatSaverDownloader {
                         try {
                             using (var ms = new MemoryStream(imageBytes))
                                 return new Tuple<SongJsonObject, Image>(o, Image.FromStream(ms));
-                        } catch(ArgumentException ex) {
-                            Console.WriteLine($"[{o.Id}] Image doesn't exist");
+                        } catch (ArgumentException ex) {
+                            Log($"[{o.Id}] Image doesn't exist");
                             using (var ms = new MemoryStream(client.DownloadData("https://pbs.twimg.com/profile_images/955933299238756352/KAIUfh1q_400x400.jpg")))
                                 return new Tuple<SongJsonObject, Image>(o, Image.FromStream(ms));
                         }
@@ -194,7 +195,7 @@ namespace BeatSaverDownloader {
                 var historyString = File.ReadAllText(historyPath);
                 if (historyString != string.Empty) CompletedIDs = JsonConvert.DeserializeObject<Dictionary<int, string>>(historyString);
             } catch (FileNotFoundException ex) {
-                Console.WriteLine("History.json does not yet exist");
+                Log("History.json does not yet exist");
             }
             int i = 0;
             string zipPath = string.Empty;
@@ -211,13 +212,18 @@ namespace BeatSaverDownloader {
                         zipPath = Path.Combine(DownloadsDir.FullName, $"{songControl.ID}.zip");
                         client.DownloadFile(string.Format(DOWNLOAD_LINK, songControl.ID), zipPath);
                         songControl?.Invoke(new genericDelegate(() => songControl.IsDownloaded.CheckState = CheckState.Indeterminate), new object[] { });
-                        var zip = ZipFile.OpenRead(zipPath);
-                        songName = zip.Entries[0].FullName.Split('/')[0];
+                        ZipArchive zip = null;
+                        try {
+                            zip = ZipFile.OpenRead(zipPath);
+                        } catch (Exception ex) {
+                            Log(ex.Message);
+                        }
+                        songName = zip?.Entries[0].FullName.Split('/')[0];
                         LabelCurrentDownloading?.Invoke(new genericDelegate(() => LabelCurrentDownloading.Text = songName), new object[] { });
                         try {
-                            zip.ExtractToDirectory(CustomSongs.FullName);
+                            zip?.ExtractToDirectory(CustomSongs.FullName);
                         } catch (IOException ex) {
-                            Console.WriteLine($"Folder [{songName}] exists. Continuing.");
+                            Log($"Folder [{songName}] exists. Continuing.");
                             songControl?.Invoke(new genericDelegate(() => songControl.IsDownloaded.CheckState = CheckState.Checked), new object[] { });
                             progressBar1?.Invoke(new genericDelegate(UpdateProgressBar), new object[] { });
                             CompletedIDs.Add(songControl.ID, songName);
@@ -229,7 +235,7 @@ namespace BeatSaverDownloader {
                         songControl?.Invoke(new genericDelegate(() => songControl.IsDownloaded.CheckState = CheckState.Checked), new object[] { });
                         progressBar1?.Invoke(new genericDelegate(UpdateProgressBar), new object[] { });
                         #endregion
-                        Console.WriteLine($"Downloaded {songName} [{songControl.ID}] to {CustomSongs.FullName}");
+                        Log($"Downloaded {songName} [{songControl.ID}] to {CustomSongs.FullName}");
                         CompletedIDs.Add(songControl.ID, songName);
                         using (var f = new StreamWriter(historyFile.Open(FileMode.Create, FileAccess.Write, FileShare.Read))) {
                             f.WriteLine(JsonConvert.SerializeObject(CompletedIDs, Formatting.Indented));
@@ -239,8 +245,8 @@ namespace BeatSaverDownloader {
                             Thread.Sleep(15);
                             songControl?.Invoke(new genericDelegate(() => songControl.IsDownloaded.CheckState = CheckState.Checked), new object[] { });
                             progressBar1?.Invoke(new genericDelegate(UpdateProgressBar), new object[] { });
-                        } catch(InvalidOperationException ex) {
-                            Console.WriteLine($"[{songControl.ID}] {ex.Message}");
+                        } catch (InvalidOperationException ex) {
+                            Log($"[{songControl.ID}] {ex.Message}");
                             Thread.Sleep(10);
                             songControl?.Invoke(new genericDelegate(() => songControl.IsDownloaded.CheckState = CheckState.Checked), new object[] { });
                             progressBar1?.Invoke(new genericDelegate(UpdateProgressBar), new object[] { });
@@ -264,8 +270,17 @@ namespace BeatSaverDownloader {
         }
 
         private void Form1_FormClosed(object sender, FormClosedEventArgs e) {
-            DownloadsDir.EnumerateFiles().ForEach(o => o.Delete());
-            DownloadsDir.EnumerateDirectories().ForEach(o => o.Delete());
+            try {
+                DownloadsDir.EnumerateFiles().ForEach(o => o.Delete());
+                DownloadsDir.EnumerateDirectories().ForEach(o => o.Delete());
+            } catch (IOException ex) {
+                Log(ex.Message);
+            }
+        }
+
+        void Log(string s) {
+            Console.WriteLine(s);
+            Debug.WriteLine(s);
         }
     }
 }
