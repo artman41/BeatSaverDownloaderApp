@@ -4,15 +4,17 @@ using System.ComponentModel;
 using System.Data;
 using System.Drawing;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace BeatSaverDownloader {
     class ListViewNF : ListView {
+        [DllImport("uxtheme", ExactSpelling = true, CharSet = CharSet.Unicode)]
+        public extern static Int32 SetWindowTheme(IntPtr hWnd, String textSubAppName, String textSubIdList);
+
         public ListViewNF() {
-            [DllImport("uxtheme", ExactSpelling = true, CharSet = CharSet.Unicode)]        
-            public extern static Int32 SetWindowTheme(IntPtr hWnd, String textSubAppName, String textSubIdList);
             //Activate double buffering
             this.SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint, true);
 
