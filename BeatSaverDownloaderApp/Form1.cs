@@ -27,7 +27,7 @@ namespace BeatSaverDownloader {
 
         DirectoryInfo AppDir = new DirectoryInfo($"{Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData)}/BeatSaverDownloader/");
 
-        DirectoryInfo DownloadsDir;
+        DirectoryInfo DownloadsDir { get; set; }
 
         Thread WorkerThread;
 
@@ -43,11 +43,13 @@ namespace BeatSaverDownloader {
 
         const string GitHubLink = "artman41/BeatSaverDownloaderApp/releases/latest";
 
+        bool IsLatestVersion { get; set; }
+
         public Form1() {
             //AppDomain.CurrentDomain.FirstChanceException += CurrentDomain_FirstChanceException; //DEBUG
-
             InitializeComponent();
             var Update = CanUpdate();
+            IsLatestVersion = !Update.Item1;
             if (Update.Item1) MessageBox.Show($"Version [{Update.Item2}] is available at http://Github.com/{GitHubLink}");
 
             AppDir.Create();
@@ -59,11 +61,7 @@ namespace BeatSaverDownloader {
                 DownloadsDir = AppDir.CreateSubdirectory("Downloads");
             }
             WorkerThread = new Thread(o => {
-                try {
-                    GetObjects();
-                } catch (Exception ex) {
-                    MessageBox.Show(ex.Message);
-                }
+                GetObjects();
                 WorkerThread.Join();
             })
             {
@@ -87,8 +85,8 @@ namespace BeatSaverDownloader {
                     }
                 }
                 var githubReleasePage = JsonConvert.DeserializeObject<JObject>(githubJsonString);
-                var remoteVersion = new Version(githubReleasePage["tag_name"].ToString());
-                if (remoteVersion.CompareTo(new Version(Application.ProductVersion)) > 0) {
+                var remoteVersion = Version.Parse(githubReleasePage["tag_name"].ToString());
+                if (remoteVersion.CompareTo(Version.Parse(Application.ProductVersion)) > 0) {
                     return new Tuple<bool, Version>(true, remoteVersion);
                 }
             }
@@ -125,18 +123,51 @@ namespace BeatSaverDownloader {
                 }
             });
             if (isShown) this.Text = string.Format(WindowTitle, Songs.Count(o => o.IsDownloaded.Checked), Songs.Count);
-            LabelOffset.Text = string.Format(labelText, CurrentOffset/15);
+            LabelOffset.Text = string.Format(labelText, CurrentOffset / 15);
             progressBar1.Maximum = Songs.Count;
         }
 
         bool isShown;
         bool run;
 
+        ToolStripButton ButtonCustomSongs, ButtonDownloads, ButtonUpdate, ButtonGithub, ButtonWiki, ButtonCredits;
+
         private void Form1_Load(object sender, EventArgs e) {
             this.Text = string.Format(WindowTitle, Songs.Count(o => o.IsDownloaded.Checked), Songs.Count, CurrentOffset);
             LabelOffset.Text = string.Format(labelText, CurrentOffset);
             isShown = true;
             CustomSongs = CustomSongsDialog.GetDirectoryInfo();
+
+            #region ToolStripInit
+            ToolStripFileButton.DropDownItems.AddRange(new[] {
+                ButtonCustomSongs = new ToolStripButton("CustomSongs", null, ButtonCustomSongs_Click, "ButtonCustomSongs"){
+                    DisplayStyle = ToolStripItemDisplayStyle.Text
+                },
+                ButtonDownloads = new ToolStripButton("Downloads", null, ButtonDownloads_Click, "ButtonDownloads"){
+                    DisplayStyle = ToolStripItemDisplayStyle.Text
+                }
+            });
+            ToolStripFileButton.DropDownItems.Remove(HOLDER);
+            HOLDER.Dispose();
+
+            if (!IsLatestVersion) {
+                ToolStripAboutButton.DropDownItems.Add(ButtonUpdate = new ToolStripButton("Update", null, ButtonUpdate_Click, "ButtonUpdate") {
+                    DisplayStyle = ToolStripItemDisplayStyle.Text
+                });
+            }
+            ToolStripAboutButton.DropDownItems.AddRange(new[] {
+                ButtonGithub = new ToolStripButton("Github", null, ButtonGithub_Click, "ButtonGithub"){
+                    DisplayStyle = ToolStripItemDisplayStyle.Text
+                },
+                ButtonWiki = new ToolStripButton("Wiki", null, ButtonWiki_Click, "ButtonWiki"){
+                    DisplayStyle = ToolStripItemDisplayStyle.Text
+                },
+                ButtonCredits = new ToolStripButton("Credits", null, ButtonCredits_Click, "ButtonCredits"){
+                    DisplayStyle = ToolStripItemDisplayStyle.Text
+                }
+            });
+            #endregion
+
             if (CustomSongs == null) {
                 MessageBox.Show("You did not set a correct path for the CustomSongs directory.");
                 Application.Exit();
@@ -166,7 +197,7 @@ namespace BeatSaverDownloader {
                             using (var ms = new MemoryStream(imageBytes))
                                 return new Tuple<SongJsonObject, Image>(o, Image.FromStream(ms));
                         } catch (ArgumentException ex) {
-                            Log($"[{o.Id}] Image doesn't exist");
+                            Log($"[{o.Id}] Image doesn't exist {{{ex.Message}}}");
                             using (var ms = new MemoryStream(client.DownloadData("https://pbs.twimg.com/profile_images/955933299238756352/KAIUfh1q_400x400.jpg")))
                                 return new Tuple<SongJsonObject, Image>(o, Image.FromStream(ms));
                         }
@@ -211,7 +242,8 @@ namespace BeatSaverDownloader {
                     LabelCurrentDownloading?.Invoke(new genericDelegate(() => LabelCurrentDownloading.Text = ""), new object[] { });
                     var historyFile = new FileInfo(Path.Combine(CustomSongs.FullName, "History.json"));
                     if (i >= flowLayoutPanel1.Controls.Count) continue;
-                    var songControl = this.flowLayoutPanel1.Controls[i] as SongItem;
+                    //var songControl = this.flowLayoutPanel1.Controls[i] as SongItem;
+                    var songControl = flowLayoutPanel1.Controls[i] as SongItem;
                     if (!CompletedIDs.Keys.Contains(songControl.ID)) {
                         string songName = string.Empty;
                         #region Downloader
@@ -298,9 +330,41 @@ namespace BeatSaverDownloader {
             }
         }
 
-        void Log(string s) {
-            Console.WriteLine(s);
+        void Log(object o) {
+            Console.WriteLine($"{o}");
             //Debug.WriteLine(s);
+
+            listView1.Items.Add(new ListViewItem(new ListViewItem.ListViewSubItem()
+        }
+
+        private void ButtonCustomSongs_Click(object sender, EventArgs e) {
+            Process.Start(CustomSongs.FullName);
+        }
+
+        private void flowLayoutPanel1_Scroll(object sender, ScrollEventArgs e) {
+            //flowLayoutPanel1.Invalidate();
+            Application.DoEvents();
+        }
+
+        private void ButtonDownloads_Click(object sender, EventArgs e) {
+            Process.Start(DownloadsDir.FullName);
+        }
+
+        private void ButtonUpdate_Click(object sender, EventArgs e) {
+            Process.Start($"http://Github.com/{GitHubLink}");
+        }
+
+        private void ButtonGithub_Click(object sender, EventArgs e) {
+            Process.Start($"http://Github.com/{GitHubLink}".Replace("/releases/latest", ""));
+        }
+
+        private void ButtonWiki_Click(object sender, EventArgs e) {
+            Process.Start($"http://Github.com/{GitHubLink}".Replace("releases/latest", "Wiki"));
+        }
+
+        private void ButtonCredits_Click(object sender, EventArgs e) {
+            var url = $"https://raw.githubusercontent.com/{Form1.GitHubLink.Replace("/releases/latest", " /master/Credits.md")}";
+            RichMessageBox.Display("Credits", url);
         }
     }
 }

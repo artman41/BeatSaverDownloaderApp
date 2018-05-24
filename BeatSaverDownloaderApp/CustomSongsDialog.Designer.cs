@@ -64,7 +64,6 @@
             this.MinimizeBox = false;
             this.Name = "CustomSongsDialog";
             this.ShowIcon = false;
-            this.ShowInTaskbar = false;
             this.Text = "CustomSongs Location";
             this.ResumeLayout(false);
             this.PerformLayout();
