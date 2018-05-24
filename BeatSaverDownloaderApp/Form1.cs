@@ -12,6 +12,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.IO.Compression;
+using Newtonsoft.Json.Linq;
 
 namespace BeatSaverDownloader {
     public partial class Form1 : Form {
@@ -37,10 +38,15 @@ namespace BeatSaverDownloader {
         const string WindowTitle = "Song Downloader - {0}/{1}";
         const string labelText = "Page {0}";
 
+        const string GitHubLink = "artman41/BeatSaverDownloaderApp/releases/latest";
+
         public Form1() {
             //AppDomain.CurrentDomain.FirstChanceException += CurrentDomain_FirstChanceException; //DEBUG
 
             InitializeComponent();
+            var Update = CanUpdate();
+            if (Update.Item1) MessageBox.Show($"Version [{Update.Item2}] is available at http://Github.com/{GitHubLink}");
+
             AppDir.Create();
             if (AppDir.GetDirectories().Any(o => o.Name == "Downloads")) {
                 DownloadsDir = AppDir.GetDirectories().First(o => o.Name == "Downloads");
@@ -62,6 +68,26 @@ namespace BeatSaverDownloader {
             OnDeserialize += onDeserialize;
 
             WorkerThread.Start();
+        }
+
+        Tuple<bool, Version> CanUpdate() {
+            var request = (HttpWebRequest)WebRequest.Create($"https://api.github.com/repos/{GitHubLink}");
+            request.Method = "GET";
+            request.UserAgent = $"BeatSaverDownloaderApp-{Application.ProductVersion}";
+            using (var response = request.GetResponse() as HttpWebResponse) {
+                string githubJsonString = string.Empty;
+                using (var stream = response.GetResponseStream()) {
+                    using (var reader = new StreamReader(stream)) {
+                        githubJsonString = reader.ReadToEnd();
+                    }
+                }
+                var githubReleasePage = JsonConvert.DeserializeObject<JObject>(githubJsonString);
+                var remoteVersion = new Version(githubReleasePage["tag_name"].ToString());
+                if(remoteVersion.CompareTo(new Version(Application.ProductVersion)) > 0) {
+                    return new Tuple<bool, Version>(true, remoteVersion);
+                }
+            }
+            return new Tuple<bool, Version>(false, null);
         }
 
         private void CurrentDomain_FirstChanceException(object sender, System.Runtime.ExceptionServices.FirstChanceExceptionEventArgs e) {
