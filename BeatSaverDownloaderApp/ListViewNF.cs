@@ -11,6 +11,8 @@ using System.Windows.Forms;
 namespace BeatSaverDownloader {
     class ListViewNF : ListView {
         public ListViewNF() {
+            [DllImport("uxtheme", ExactSpelling = true, CharSet = CharSet.Unicode)]        
+            public extern static Int32 SetWindowTheme(IntPtr hWnd, String textSubAppName, String textSubIdList);
             //Activate double buffering
             this.SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint, true);
 
@@ -18,7 +20,11 @@ namespace BeatSaverDownloader {
             // Windows messages before they get to the form's WndProc
             this.SetStyle(ControlStyles.EnableNotifyMessage, true);
         }
-
+        protected override void OnHandleCreated(EventArgs e)      
+        {          
+            SetWindowTheme(Handle, "explorer", null);       
+            base.OnHandleCreated(e);     
+        }
         protected override void OnNotifyMessage(Message m) {
             //Filter out the WM_ERASEBKGND message
             if (m.Msg != 0x14) {
