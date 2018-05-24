@@ -31,7 +31,9 @@ namespace BeatSaverDownloader {
 
         Thread WorkerThread;
 
-        List<SongItem> Songs { get; set; } = new List<SongItem>();
+        //List<SongItem> Songs { get; set; } = new List<SongItem>();
+        List<ListViewItem> Songs { get; set; } = new List<ListViewItem>();
+        ImageList CoverArts { get; set; } = new ImageList { ImageSize = new Size(60, 60) };
 
         delegate void SongJsonHandler(object sender, Tuple<SongJsonObject, Image>[] array);
         SongJsonHandler OnDeserialize;
@@ -48,6 +50,8 @@ namespace BeatSaverDownloader {
         public Form1() {
             //AppDomain.CurrentDomain.FirstChanceException += CurrentDomain_FirstChanceException; //DEBUG
             InitializeComponent();
+            listView1.LargeImageList = CoverArts;
+            listView1.SmallImageList = CoverArts;
             var Update = CanUpdate();
             IsLatestVersion = !Update.Item1;
             if (Update.Item1) MessageBox.Show($"Version [{Update.Item2}] is available at http://Github.com/{GitHubLink}");
@@ -102,27 +106,43 @@ namespace BeatSaverDownloader {
         delegate void UpdatePanelDelegate(SongItem[] songs);
 
         private void onDeserialize(object sender, Tuple<SongJsonObject, Image>[] array) {
-            if (flowLayoutPanel1.InvokeRequired) {
+            if (listView1.InvokeRequired) {
                 var newItems = array.Where(o => !SongObjects.Contains(o.Item1)).Select(o => o.Item1).ToArray();
                 SongObjects.AddRange(newItems);
                 var temp = new List<SongItem>();
                 newItems.ForEach(o => {
                     o.Beatname = Utility.HtmlDecode(o.Beatname);
-                    o.AuthorName = Utility.HtmlDecode(o.Beatname);
+                    o.AuthorName = Utility.HtmlDecode(o.AuthorName);
                     temp.Add(new SongItem(o.Beatname, o.AuthorName, array.First(x => x.Item1 == o).Item2, int.Parse(o.Id)));
                 });
-                flowLayoutPanel1.Invoke(new UpdatePanelDelegate(UpdatePanel), new object[] { temp.ToArray() });
+                listView1.Invoke(new UpdatePanelDelegate(UpdatePanel), new object[] { temp.ToArray() });
             }
+        }
+
+        struct ListViewItemData {
+            public enum _State {
+                Queued, Processing, Processed
+            }
+
+            public _State State { get; set; }
+            public int ID { get; set; }
         }
 
         void UpdatePanel(SongItem[] songs) {
             songs.ForEach(s => {
-                if (!Songs.Any(o => o.ID == s.ID)) {
-                    Songs.Add(s);
-                    flowLayoutPanel1.Controls.Add(s);
+                if (!Songs.Any(o => ((ListViewItemData)o.Tag).ID == s.ID)) {
+                    CoverArts.Images.Add(s.ID.ToString(), s.CoverArt);
+                    var item = new ListViewItem {
+                        Text = s.SongName,
+                        ImageKey = s.ID.ToString(),
+                        Tag = new ListViewItemData { ID = s.ID }
+                    };
+                    item.SubItems.Add(s.SongAuthor);
+                    Songs.Add(item);
+                    listView1.Items.Add(item);
                 }
             });
-            if (isShown) this.Text = string.Format(WindowTitle, Songs.Count(o => o.IsDownloaded.Checked), Songs.Count);
+            if (isShown) this.Text = string.Format(WindowTitle, Songs.Count(o => o.ForeColor == Color.Green), Songs.Count);
             LabelOffset.Text = string.Format(labelText, CurrentOffset / 15);
             progressBar1.Maximum = Songs.Count;
         }
@@ -132,13 +152,21 @@ namespace BeatSaverDownloader {
 
         ToolStripButton ButtonCustomSongs, ButtonDownloads, ButtonUpdate, ButtonGithub, ButtonWiki, ButtonCredits;
 
+        CheckBox JumpCheck { get; set; }
+
         private void Form1_Load(object sender, EventArgs e) {
-            this.Text = string.Format(WindowTitle, Songs.Count(o => o.IsDownloaded.Checked), Songs.Count, CurrentOffset);
+            this.Text = string.Format(WindowTitle, Songs.Count(o => ((ListViewItemData)o.Tag).State == ListViewItemData._State.Processed), Songs.Count, CurrentOffset);
             LabelOffset.Text = string.Format(labelText, CurrentOffset);
             isShown = true;
             CustomSongs = CustomSongsDialog.GetDirectoryInfo();
 
             #region ToolStripInit
+            JumpCheck = new CheckBox {
+                Text = "Jump to Latest Download"
+            };
+            ToolStripControlHost host = new ToolStripControlHost(JumpCheck);
+            ToolStrip.Items.Add(host);
+
             ToolStripFileButton.DropDownItems.AddRange(new[] {
                 ButtonCustomSongs = new ToolStripButton("CustomSongs", null, ButtonCustomSongs_Click, "ButtonCustomSongs"){
                     DisplayStyle = ToolStripItemDisplayStyle.Text
@@ -209,7 +237,7 @@ namespace BeatSaverDownloader {
 
         Thread DownloaderThread { get; set; } = null;
         private void ButtonDownload_Click(object sender, EventArgs e) {
-            if (flowLayoutPanel1.Controls.Count == 0) return;
+            if (listView1.Items.Count == 0) return;
             if (DownloaderThread == null) {
                 DownloaderThread = new Thread(() => {
                     DownloadSongs();
@@ -241,16 +269,22 @@ namespace BeatSaverDownloader {
                     //if (zipPath != string.Empty && File.Exists(zipPath)) File.Delete(zipPath);
                     LabelCurrentDownloading?.Invoke(new genericDelegate(() => LabelCurrentDownloading.Text = ""), new object[] { });
                     var historyFile = new FileInfo(Path.Combine(CustomSongs.FullName, "History.json"));
-                    if (i >= flowLayoutPanel1.Controls.Count) continue;
+                    if (i >= listView1.Items.Count) continue;
                     //var songControl = this.flowLayoutPanel1.Controls[i] as SongItem;
-                    var songControl = flowLayoutPanel1.Controls[i] as SongItem;
-                    if (!CompletedIDs.Keys.Contains(songControl.ID)) {
+                    ListViewItem temp = Songs[i];
+                    if (JumpCheck.Checked) {
+                        listView1?.Invoke(new genericDelegate(() => {
+                            listView1.FocusedItem = temp;
+                        }), new object[] { });
+                    }
+                    var data = ((ListViewItemData)temp.Tag);
+                    if (!CompletedIDs.Keys.Contains(data.ID)) {
                         string songName = string.Empty;
                         #region Downloader
-                        LabelCurrentDownloading?.Invoke(new genericDelegate(() => LabelCurrentDownloading.Text = $"Downloading: {songControl.SongName} [{songControl.ID}]"), new object[] { });
-                        zipPath = Path.Combine(DownloadsDir.FullName, $"{songControl.ID}.zip");
-                        client.DownloadFile(string.Format(DOWNLOAD_LINK, songControl.ID), zipPath);
-                        songControl?.Invoke(new genericDelegate(() => songControl.IsDownloaded.CheckState = CheckState.Indeterminate), new object[] { });
+                        LabelCurrentDownloading?.Invoke(new genericDelegate(() => LabelCurrentDownloading.Text = $"Downloading: {temp.Text} [{data.ID}]"), new object[] { });
+                        zipPath = Path.Combine(DownloadsDir.FullName, $"{data.ID}.zip");
+                        client.DownloadFile(string.Format(DOWNLOAD_LINK, data.ID), zipPath);
+                        listView1?.Invoke(new genericDelegate(() =>{ data.State = ListViewItemData._State.Processing;temp.ForeColor = Color.Orange; }), new object[] { });
                         ZipArchive zip = null;
                         try {
                             zip = ZipFile.OpenRead(zipPath);
@@ -263,44 +297,44 @@ namespace BeatSaverDownloader {
                             try {
                                 zip.Dispose();
                                 File.Delete(zipPath);
-                                Log($"Deleted Zip [{songControl.ID}]");
+                                Log($"Deleted Zip [{data.ID}]");
                             } catch (IOException ex) {
-                                Log($"Failed to remove Zip [{songControl.ID}]");
+                                Log($"Failed to remove Zip [{data.ID}]");
                             }
                         } catch (IOException ex) {
                             Log($"Folder [{songName}] exists. Continuing.");
                             try {
                                 zip.Dispose();
                                 File.Delete(zipPath);
-                                Log($"Deleted Zip [{songControl.ID}]");
+                                Log($"Deleted Zip [{data.ID}]");
                             } catch (IOException) {
-                                Log($"Failed to remove Zip [{songControl.ID}]");
+                                Log($"Failed to remove Zip [{data.ID}]");
                             }
-                            songControl?.Invoke(new genericDelegate(() => songControl.IsDownloaded.CheckState = CheckState.Checked), new object[] { });
+                            listView1?.Invoke(new genericDelegate(() => { data.State = ListViewItemData._State.Processed; temp.ForeColor = Color.Green; }), new object[] { });
                             progressBar1?.Invoke(new genericDelegate(UpdateProgressBar), new object[] { });
-                            CompletedIDs.Add(songControl.ID, songName);
+                            CompletedIDs.Add(data.ID, songName);
                             using (var f = new StreamWriter(historyFile.Open(FileMode.Create, FileAccess.Write, FileShare.Read))) {
                                 f.WriteLine(JsonConvert.SerializeObject(CompletedIDs, Formatting.Indented));
                             }
                             continue;
                         }
-                        songControl?.Invoke(new genericDelegate(() => songControl.IsDownloaded.CheckState = CheckState.Checked), new object[] { });
+                        listView1?.Invoke(new genericDelegate(() => { data.State = ListViewItemData._State.Processed; temp.ForeColor = Color.Green; }), new object[] { });
                         progressBar1?.Invoke(new genericDelegate(UpdateProgressBar), new object[] { });
                         #endregion
-                        Log($"Downloaded {songName} [{songControl.ID}] to {CustomSongs.FullName}");
-                        CompletedIDs.Add(songControl.ID, songName);
+                        Log($"Downloaded {songName} [{data.ID}] to {CustomSongs.FullName}");
+                        CompletedIDs.Add(data.ID, songName);
                         using (var f = new StreamWriter(historyFile.Open(FileMode.Create, FileAccess.Write, FileShare.Read))) {
                             f.WriteLine(JsonConvert.SerializeObject(CompletedIDs, Formatting.Indented));
                         }
                     } else {
                         try {
                             Thread.Sleep(15);
-                            songControl?.Invoke(new genericDelegate(() => songControl.IsDownloaded.CheckState = CheckState.Checked), new object[] { });
+                            listView1?.Invoke(new genericDelegate(() => { data.State = ListViewItemData._State.Processed; temp.ForeColor = Color.Green; }), new object[] { });
                             progressBar1?.Invoke(new genericDelegate(UpdateProgressBar), new object[] { });
                         } catch (InvalidOperationException ex) {
-                            Log($"[{songControl.ID}] {ex.Message}");
+                            Log($"[{data.ID}] {ex.Message}");
                             Thread.Sleep(10);
-                            songControl?.Invoke(new genericDelegate(() => songControl.IsDownloaded.CheckState = CheckState.Checked), new object[] { });
+                            listView1?.Invoke(new genericDelegate(() => { data.State = ListViewItemData._State.Processed; temp.ForeColor = Color.Green; }), new object[] { });
                             progressBar1?.Invoke(new genericDelegate(UpdateProgressBar), new object[] { });
                         }
                     }
@@ -314,7 +348,7 @@ namespace BeatSaverDownloader {
         }
 
         void UpdateProgressBar() {
-            this.progressBar1.Value = Songs.Count(o => o.IsDownloaded.Checked);
+            this.progressBar1.Value = Songs.Count(o => ((ListViewItemData)o.Tag).State == ListViewItemData._State.Processed);
         }
 
         private void Form1_FormClosing(object sender, FormClosingEventArgs e) {
@@ -333,17 +367,15 @@ namespace BeatSaverDownloader {
         void Log(object o) {
             Console.WriteLine($"{o}");
             //Debug.WriteLine(s);
-
-            listView1.Items.Add(new ListViewItem(new ListViewItem.ListViewSubItem()
         }
 
         private void ButtonCustomSongs_Click(object sender, EventArgs e) {
             Process.Start(CustomSongs.FullName);
         }
 
-        private void flowLayoutPanel1_Scroll(object sender, ScrollEventArgs e) {
-            //flowLayoutPanel1.Invalidate();
-            Application.DoEvents();
+        private void listView1_SelectedIndexChanged(object sender, EventArgs e) {
+            var length = (sender as ListView).SelectedIndices.Count;
+            Parallel.For(0, length, i => Process.Start($"https://beatsaver.com/details.php?id={((ListViewItemData)(sender as ListView).Items[i].Tag).ID}"));
         }
 
         private void ButtonDownloads_Click(object sender, EventArgs e) {
