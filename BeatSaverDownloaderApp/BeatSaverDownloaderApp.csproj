@@ -135,4 +135,12 @@
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PostBuildEvent>if not exist $(ProjectDir)Output\$(ConfigurationName)\ mkdir $(ProjectDir)Output\$(ConfigurationName)\
+powershell Compress-Archive -Path '$(TargetDir)*.dll', '$(TargetDir)*.exe' -DestinationPath '$(ProjectDir)Output\$(ConfigurationName)\$(ProjectName).zip' -Force</PostBuildEvent>
+  </PropertyGroup>
+  <PropertyGroup>
+    <PreBuildEvent>
+    </PreBuildEvent>
+  </PropertyGroup>
 </Project>
