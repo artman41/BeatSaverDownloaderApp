@@ -404,7 +404,7 @@ namespace BeatSaverDownloader {
 
         private void listView1_SelectedIndexChanged(object sender, EventArgs e) {
             var length = (sender as ListView).SelectedIndices.Count;
-            Parallel.For(0, length, i => Process.Start($"https://beatsaver.com/details.php?id={((ListViewItemData)(sender as ListView).Items[i].Tag).ID}"));
+            Parallel.For(0, length, i => listView1?.Invoke(new genericDelegate(() => Process.Start($"https://beatsaver.com/details.php?id={((ListViewItemData)(sender as ListView).Items[i].Tag).ID}")), new object[] { }));
         }
 
         private void ButtonDownloads_Click(object sender, EventArgs e) {
