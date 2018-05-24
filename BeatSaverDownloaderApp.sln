@@ -5,6 +5,8 @@ VisualStudioVersion = 15.0.27428.2043
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BeatSaverDownloaderApp", "BeatSaverDownloaderApp\BeatSaverDownloaderApp.csproj", "{4C8FC7FA-B266-49C5-8732-3034567451BF}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HTML5DecodePortable", "HTML5DecodePortable\HTML5DecodePortable.csproj", "{0428DF7B-A34E-480A-B8E0-C2547B02A280}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +17,10 @@ Global
 		{4C8FC7FA-B266-49C5-8732-3034567451BF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4C8FC7FA-B266-49C5-8732-3034567451BF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4C8FC7FA-B266-49C5-8732-3034567451BF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0428DF7B-A34E-480A-B8E0-C2547B02A280}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0428DF7B-A34E-480A-B8E0-C2547B02A280}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0428DF7B-A34E-480A-B8E0-C2547B02A280}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0428DF7B-A34E-480A-B8E0-C2547B02A280}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

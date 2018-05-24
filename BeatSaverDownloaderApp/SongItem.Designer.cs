@@ -116,11 +116,11 @@
         }
 
         #endregion
-        private System.Windows.Forms.Label LabelName;
         private System.Windows.Forms.Label LabelAuthor;
         private System.Windows.Forms.PictureBox pictureBox1;
         public System.Windows.Forms.CheckBox IsDownloaded;
         private System.Windows.Forms.ToolTip ToolTip;
         private System.Windows.Forms.LinkLabel LabelID;
+        private System.Windows.Forms.Label LabelName;
     }
 }

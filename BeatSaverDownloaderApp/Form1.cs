@@ -14,6 +14,8 @@ using System.Windows.Forms;
 using System.IO.Compression;
 using Newtonsoft.Json.Linq;
 using System.Diagnostics;
+using System.Web;
+using HTML5DecodePortable;
 
 namespace BeatSaverDownloader {
     public partial class Form1 : Form {
@@ -105,6 +107,8 @@ namespace BeatSaverDownloader {
                 SongObjects.AddRange(newItems);
                 var temp = new List<SongItem>();
                 newItems.ForEach(o => {
+                    o.Beatname = Utility.HtmlDecode(o.Beatname);
+                    o.AuthorName = Utility.HtmlDecode(o.Beatname);
                     temp.Add(new SongItem(o.Beatname, o.AuthorName, array.First(x => x.Item1 == o).Item2, int.Parse(o.Id)));
                 });
                 flowLayoutPanel1.Invoke(new UpdatePanelDelegate(UpdatePanel), new object[] { temp.ToArray() });
@@ -119,7 +123,7 @@ namespace BeatSaverDownloader {
                 }
             });
             if (isShown) this.Text = string.Format(WindowTitle, Songs.Count(o => o.IsDownloaded.Checked), Songs.Count);
-            LabelOffset.Text = string.Format(labelText, CurrentOffset);
+            LabelOffset.Text = string.Format(labelText, CurrentOffset/15);
             progressBar1.Maximum = Songs.Count;
         }
 
@@ -209,6 +213,7 @@ namespace BeatSaverDownloader {
                     if (!CompletedIDs.Keys.Contains(songControl.ID)) {
                         string songName = string.Empty;
                         #region Downloader
+                        LabelCurrentDownloading?.Invoke(new genericDelegate(() => LabelCurrentDownloading.Text = $"Downloading: {songControl.SongName} [{songControl.ID}]"), new object[] { });
                         zipPath = Path.Combine(DownloadsDir.FullName, $"{songControl.ID}.zip");
                         client.DownloadFile(string.Format(DOWNLOAD_LINK, songControl.ID), zipPath);
                         songControl?.Invoke(new genericDelegate(() => songControl.IsDownloaded.CheckState = CheckState.Indeterminate), new object[] { });
@@ -219,7 +224,6 @@ namespace BeatSaverDownloader {
                             Log(ex.Message);
                         }
                         songName = zip?.Entries[0].FullName.Split('/')[0];
-                        LabelCurrentDownloading?.Invoke(new genericDelegate(() => LabelCurrentDownloading.Text = songName), new object[] { });
                         try {
                             zip?.ExtractToDirectory(CustomSongs.FullName);
                         } catch (IOException ex) {

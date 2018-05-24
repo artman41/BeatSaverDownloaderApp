@@ -13,10 +13,10 @@ namespace BeatSaverDownloader
 {
     public partial class SongItem : UserControl
     {
-        string SongName { get; set; }
-        string SongAuthor { get; set; }
-        Image CoverArt { get; set; }
-        public int ID { get; set; }
+        public string SongName { get; private set; }
+        public string SongAuthor { get; private set; }
+        public Image CoverArt { get; private set; }
+        public int ID { get; private set; }
 
         public SongItem()
         {
