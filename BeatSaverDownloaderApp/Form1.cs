@@ -65,8 +65,10 @@ namespace BeatSaverDownloader {
                     MessageBox.Show(ex.Message);
                 }
                 WorkerThread.Join();
-            });
-            WorkerThread.IsBackground = true;
+            })
+            {
+                IsBackground = true
+            };
 
             OnDeserialize += onDeserialize;
 
@@ -226,8 +228,22 @@ namespace BeatSaverDownloader {
                         songName = zip?.Entries[0].FullName.Split('/')[0];
                         try {
                             zip?.ExtractToDirectory(CustomSongs.FullName);
+                            try {
+                                zip.Dispose();
+                                File.Delete(zipPath);
+                                Log($"Deleted Zip [{songControl.ID}]");
+                            } catch (IOException ex) {
+                                Log($"Failed to remove Zip [{songControl.ID}]");
+                            }
                         } catch (IOException ex) {
                             Log($"Folder [{songName}] exists. Continuing.");
+                            try {
+                                zip.Dispose();
+                                File.Delete(zipPath);
+                                Log($"Deleted Zip [{songControl.ID}]");
+                            } catch (IOException) {
+                                Log($"Failed to remove Zip [{songControl.ID}]");
+                            }
                             songControl?.Invoke(new genericDelegate(() => songControl.IsDownloaded.CheckState = CheckState.Checked), new object[] { });
                             progressBar1?.Invoke(new genericDelegate(UpdateProgressBar), new object[] { });
                             CompletedIDs.Add(songControl.ID, songName);
@@ -284,7 +300,7 @@ namespace BeatSaverDownloader {
 
         void Log(string s) {
             Console.WriteLine(s);
-            Debug.WriteLine(s);
+            //Debug.WriteLine(s);
         }
     }
 }
