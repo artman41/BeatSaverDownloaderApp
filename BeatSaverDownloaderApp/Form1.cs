@@ -142,6 +142,7 @@ namespace BeatSaverDownloader {
                     listView1.Items.Add(item);
                 }
             });
+            this.Text = string.Format(WindowTitle, Songs.Count(o => ((ListViewItemData)o.Tag).State == ListViewItemData._State.Processed), Songs.Count, CurrentOffset);
             LabelOffset.Text = string.Format(labelText, CurrentOffset / 15);
             progressBar1.Maximum = Songs.Count;
         }
