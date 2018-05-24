@@ -142,7 +142,6 @@ namespace BeatSaverDownloader {
                     listView1.Items.Add(item);
                 }
             });
-            if (isShown) this.Text = string.Format(WindowTitle, Songs.Count(o => o.ForeColor == Color.Green), Songs.Count);
             LabelOffset.Text = string.Format(labelText, CurrentOffset / 15);
             progressBar1.Maximum = Songs.Count;
         }
@@ -266,7 +265,7 @@ namespace BeatSaverDownloader {
             string zipPath = string.Empty;
             using (var client = new WebClient()) {
                 while (run) {
-                    Log($"Progress Bar @ {progressBar1.Value}/{progressBar1.Maximum}");
+                    if (isShown) this?.Invoke(new genericDelegate(() => this.Text = string.Format(WindowTitle, Songs.Count(o => ((ListViewItemData)o.Tag).State == ListViewItemData._State.Processed), Songs.Count)), new object[] { });
                     //if (zipPath != string.Empty && File.Exists(zipPath)) File.Delete(zipPath);
                     LabelCurrentDownloading?.Invoke(new genericDelegate(() => LabelCurrentDownloading.Text = ""), new object[] { });
                     var historyFile = new FileInfo(Path.Combine(CustomSongs.FullName, "History.json"));
@@ -403,8 +402,8 @@ namespace BeatSaverDownloader {
         }
 
         private void listView1_SelectedIndexChanged(object sender, EventArgs e) {
-            var length = (sender as ListView).SelectedIndices.Count;
-            Parallel.For(0, length, i => listView1?.Invoke(new genericDelegate(() => Process.Start($"https://beatsaver.com/details.php?id={((ListViewItemData)(sender as ListView).Items[i].Tag).ID}")), new object[] { }));
+            var length = listView1.SelectedItems.Count;
+            Parallel.For(0, length, i => listView1?.Invoke(new genericDelegate(() => Process.Start($"https://beatsaver.com/details.php?id={((ListViewItemData)(sender as ListView).SelectedItems[i].Tag).ID}")), new object[] { }));
         }
 
         private void ButtonDownloads_Click(object sender, EventArgs e) {
