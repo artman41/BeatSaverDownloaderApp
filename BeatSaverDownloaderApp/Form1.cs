@@ -220,16 +220,25 @@ namespace BeatSaverDownloader {
                     jsonString = client.DownloadString(string.Format(API, CurrentOffset));
                     OnDeserialize?.Invoke(this, objs.Select(o => {
                         var imageUrl = string.Format(IMAGE, o.Id, o.Img);
-                        var imageBytes = client.DownloadData(imageUrl);
+                        byte[] imageBytes = null;
+                        bool errored = false;
                         try {
-                            using (var ms = new MemoryStream(imageBytes))
-                                return new Tuple<SongJsonObject, Image>(o, Image.FromStream(ms));
-                        } catch (ArgumentException ex) {
-                            Log($"[{o.Id}] Image doesn't exist {{{ex.Message}}}");
-                            using (var ms = new MemoryStream(client.DownloadData("https://pbs.twimg.com/profile_images/955933299238756352/KAIUfh1q_400x400.jpg")))
-                                return new Tuple<SongJsonObject, Image>(o, Image.FromStream(ms));
+                            imageBytes = client.DownloadData(imageUrl);
+                        } catch (WebException ex) {
+                            errored = true;
                         }
-                    }).ToArray());
+                        if (!errored) {
+                            try {
+                                using (var ms = new MemoryStream(imageBytes))
+                                    return new Tuple<SongJsonObject, Image>(o, Image.FromStream(ms));
+                            } catch (ArgumentException ex) {
+                                Log($"[{o.Id}] Image doesn't exist {{{ex.Message}}}");
+                                using (var ms = new MemoryStream(client.DownloadData("https://pbs.twimg.com/profile_images/955933299238756352/KAIUfh1q_400x400.jpg")))
+                                    return new Tuple<SongJsonObject, Image>(o, Image.FromStream(ms));
+                            }
+                        }
+                        return null;
+                    }).Where(o => o != null).ToArray());
                 }
             }
             return x;
@@ -403,8 +412,10 @@ namespace BeatSaverDownloader {
         }
 
         private void listView1_SelectedIndexChanged(object sender, EventArgs e) {
-            var length = listView1.SelectedItems.Count;
-            Parallel.For(0, length, i => listView1?.Invoke(new genericDelegate(() => Process.Start($"https://beatsaver.com/details.php?id={((ListViewItemData)(sender as ListView).SelectedItems[i].Tag).ID}")), new object[] { }));
+            if (listView1.SelectedItems.Count < 1) return;
+            //var length = listView1.SelectedItems.Count;
+            //Parallel.For(0, length, i => listView1?.Invoke(new genericDelegate(() => Process.Start($"https://beatsaver.com/details.php?id={((ListViewItemData)(sender as ListView).SelectedItems[i].Tag).ID}")), new object[] { }));
+            Process.Start($"https://beatsaver.com/details.php?id={((ListViewItemData)listView1.SelectedItems[0].Tag).ID}");
         }
 
         private void ButtonDownloads_Click(object sender, EventArgs e) {
